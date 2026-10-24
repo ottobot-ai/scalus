@@ -15,7 +15,7 @@ import scala.util.Try
   *
   * Each script ends in `()` when its property holds and in `error` otherwise. The expected verdicts
   * are rows of `constr-index-verdicts.tsv`, taken from the executed reference (plutus 1.70.0.0,
-  * `evaluateScript`) for Plutus V2 and V3 at protocols 9 and 10, and the bytes that `serialiseData`
+  * `evaluateScript`) for Plutus V2 and V3 at protocols 9 to 11, and the bytes that `serialiseData`
   * must produce are those of `constr-index-serialise-data.tsv`; no expectation is written down in
   * this file. A row also holds the SHA-256 of the script it was obtained for, and the test checks
   * that the script built here is that one.
@@ -85,7 +85,6 @@ class ConstrIndexReferenceTest extends AnyFunSuite {
     private val rows: Vector[Row] =
         lines("plutus-reference/constr-index-verdicts.tsv")
             .map(c => Row(c(0), c(1).toInt, c(2).toInt, c(3), c(4) == "success"))
-            .filter(_.protocol <= 10)
 
     private def vm(language: Int, protocol: Int): PlutusVM = {
         val pv = MajorProtocolVersion(protocol)

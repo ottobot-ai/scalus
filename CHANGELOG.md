@@ -23,6 +23,8 @@
 - **`Data.Constr` accepts a negative index, and `constrData` takes any `Integer` before protocol
   version 11, as Plutus does. Code that relied on the non-negative assertion of `Constr` must
   validate the index.**
+- `constrData` fails for an index outside 0 to 2^64 - 1 from protocol version 11, as Plutus does.
+  Before, it built the constructor.
 
 ## 1.4.1 (2026-10-25)
 

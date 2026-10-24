@@ -567,8 +567,9 @@ private[builtin] abstract class AbstractBuiltins(using ps: PlatformSpecific):
     /** Construct a Data.Constr value.
       *
       * @param ctor
-      *   constructor index, any integer: the reference's `constrData` takes an `Integer` in the
-      *   semantics variants A, B and C
+      *   constructor index, any integer here: the reference's `constrData` takes an `Integer` in
+      *   the semantics variants A, B and C and a `Word64` in D and E (protocol version 11), which
+      *   the machine's builtin enforces
       * @param args
       *   list of constructor arguments
       */

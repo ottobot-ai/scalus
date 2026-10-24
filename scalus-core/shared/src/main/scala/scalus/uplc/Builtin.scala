@@ -571,6 +571,9 @@ class CardanoBuiltins(
           Integer ->: DefaultUni.List(DefaultUni.Data) ->: DefaultUni.Data,
           (_: Logger, args: Seq[CekValue]) =>
               val i = args(0).asInteger
+              // variants D and E take the index as a Word64, A, B and C as an Integer
+              if ensurable && (i.signum < 0 || i.bitLength > 64) then
+                  throw new BuiltinException(s"constrData: index out of the Word64 range: $i")
               val argsList = args(1).asList.map {
                   case Constant.Data(d) => d
                   case _ => throw new DeserializationError(DefaultFun.ConstrData, args(1))

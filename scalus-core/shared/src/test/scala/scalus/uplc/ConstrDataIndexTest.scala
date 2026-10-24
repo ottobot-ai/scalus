@@ -3,7 +3,7 @@ package scalus.uplc
 import org.scalatest.funsuite.AnyFunSuite
 import scalus.cardano.onchain.plutus.prelude.List as PList
 import scalus.uplc.builtin.{platform, Builtins, ByteString, Data}
-import scalus.uplc.eval.{CekValue, NoLogger, PlutusVM}
+import scalus.uplc.eval.{BuiltinException, CekValue, NoLogger, PlutusVM}
 
 /** The index of `constrData`: the reference takes any `Integer` in the semantics variants A, B and
   * C (protocol versions up to 10) and an unsigned 64-bit integer in D and E (protocol 11,
@@ -55,5 +55,22 @@ class ConstrDataIndexTest extends AnyFunSuite {
               ByteString.fromHex("d866823bffffffffffffffff80")
         )
         assert(Data.Constr(-1, PList.Nil) != Data.Constr(0, PList.Nil))
+    }
+
+    private val restricted = Seq(BuiltinSemanticsVariant.D, BuiltinSemanticsVariant.E)
+
+    for variant <- restricted do {
+        test(s"constrData in variant $variant rejects an index outside the Word64 range") {
+            for index <- Seq(BigInt(-1), twoTo64, -twoTo64, -(BigInt(1) << 600), BigInt(1) << 600)
+            do intercept[BuiltinException](constrData(variant, index))
+        }
+
+        test(s"constrData in variant $variant accepts the ends of the Word64 range") {
+            for index <- Seq(BigInt(0), BigInt(1), BigInt(1) << 63, twoTo64 - 1) do
+                assert(
+                  constrData(variant, index) ==
+                      CekValue.VCon(Constant.Data(Data.Constr(index, PList.Nil)))
+                )
+        }
     }
 }
