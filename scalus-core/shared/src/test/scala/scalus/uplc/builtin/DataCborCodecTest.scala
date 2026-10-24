@@ -133,6 +133,8 @@ class DataCborCodecTest extends AnyFunSuite with ScalaCheckPropertyChecks with A
     test("Constr index must be a non-negative integer") {
         assertRejects("d8 66 82 20 80") // -1
         assertRejects("d8 66 82 3b 8000000000000000 80") // -2^63 - 1, a negative overlong
+        assertRejects("d8 66 82 3b ffffffffffffffff 80") // -2^64
+        assertRejects("d8 66 82 c3 49 010000000000000000 80") // a negative big number
     }
 
     test("tag 102 rejects a three-element array") {

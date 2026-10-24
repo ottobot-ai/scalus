@@ -110,8 +110,8 @@ object DataCborWriter {
             writeBytes(out, bytes)
         }
 
-    /** The bytes of [[writeConstrIndex]]. A `Constr` of this library has no negative index, but the
-      * reference's has any `Integer`, and the function writes both.
+    /** The bytes of [[writeConstrIndex]]: the reference's `Constr` has any `Integer` index, and the
+      * function writes a negative one as well as a non-negative one.
       */
     private[builtin] def encodeConstrIndex(value: BigInt): Array[Byte] = {
         val out = new ByteArrayOutputStream()

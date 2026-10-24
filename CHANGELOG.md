@@ -20,6 +20,9 @@
   `constr` term behind it fail to decode.
 - `Data` equality and `hashCode` need no stack proportional to the nesting depth, so deeply nested
   `Data` can be compared and hashed without a `StackOverflowError`.
+- **`Data.Constr` accepts a negative index, and `constrData` takes any `Integer` before protocol
+  version 11, as Plutus does. Code that relied on the non-negative assertion of `Constr` must
+  validate the index.**
 
 ## 1.4.1 (2026-10-25)
 

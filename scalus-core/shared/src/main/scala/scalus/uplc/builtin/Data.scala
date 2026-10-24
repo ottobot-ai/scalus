@@ -140,7 +140,10 @@ object Data extends DataApi:
       * Corresponds to UPLC builtins `constrData` and `unConstrData`.
       *
       * @param constr
-      *   the constructor index (must be non-negative)
+      *   the constructor index. The reference's `Constr` takes any `Integer`, and scripts can build
+      *   a negative or wider-than-64-bit index with `constrData` (see `Builtins.constrData`). The
+      *   decoders of the ledger encodings (CBOR) reject a negative index, as the reference's
+      *   `decodeConstr` does.
       * @param args
       *   the constructor arguments as a list of Data values
       *
@@ -156,9 +159,7 @@ object Data extends DataApi:
       *   Constr(1, List(B(ByteString.fromString("x"))))
       *   }}}
       */
-    case class Constr(constr: BigInt, args: PList[Data]) extends Data {
-        assert(constr >= 0, s"Constructor must be non-negative, got $constr")
-    }
+    case class Constr(constr: BigInt, args: PList[Data]) extends Data
 
     /** Key-value mapping - represents associative data structures.
       *

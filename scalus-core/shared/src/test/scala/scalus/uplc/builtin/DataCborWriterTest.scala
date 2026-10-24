@@ -129,9 +129,7 @@ class DataCborWriterTest extends AnyFunSuite with ScalaCheckPropertyChecks with 
               hex(DataCborWriter.encodeConstrIndex(index)) == indexBytes,
               s"index of $bits bits, positive=$positive"
             )
-            // a `Constr` of this library has no negative index
-            if positive then
-                assert(hex(DataCborWriter.encode(Constr(index, PList.Nil))) == expected, s"$bits")
+            assert(hex(DataCborWriter.encode(Constr(index, PList.Nil))) == expected, s"$bits")
         }
     }
 
