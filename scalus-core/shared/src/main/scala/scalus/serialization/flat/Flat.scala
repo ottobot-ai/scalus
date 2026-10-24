@@ -229,7 +229,45 @@ given Flat[String] with
     def decode(decode: DecoderState): String =
         val baDecoder = summon[Flat[Array[Byte]]]
         val bytes = baDecoder.decode(decode)
+        // `dUTF8` decodes with the strict `decodeUtf8'` and fails on invalid input
+        // (PlutusCore/Flat/Decoder/Strict.hs); `new String` would replace it with U+FFFD
+        if !isWellFormedUtf8(bytes) then
+            throw new FlatDecodingError("Input contains invalid UTF-8 data")
         new String(bytes, "UTF-8")
+
+/** Whether `bytes` are well-formed UTF-8 in the sense of Unicode Table 3-7: no overlong forms, no
+  * surrogates (U+D800 to U+DFFF), nothing above U+10FFFF and no truncated sequence. It is written
+  * out so that every platform decides alike, which `CharsetDecoder` on JVM, Scala.js and Scala
+  * Native is not guaranteed to do.
+  */
+private[scalus] def isWellFormedUtf8(bytes: Array[Byte]): Boolean = {
+    def continuation(at: Int, low: Int = 0x80, high: Int = 0xbf): Boolean =
+        at < bytes.length && (bytes(at) & 0xff) >= low && (bytes(at) & 0xff) <= high
+
+    var i = 0
+    var ok = true
+    while ok && i < bytes.length do {
+        val b = bytes(i) & 0xff
+        if b <= 0x7f then i += 1
+        else if b >= 0xc2 && b <= 0xdf then
+            ok = continuation(i + 1)
+            i += 2
+        else if b >= 0xe0 && b <= 0xef then
+            // E0 needs A0..BF behind it (else overlong), ED needs 80..9F (else a surrogate)
+            val low = if b == 0xe0 then 0xa0 else 0x80
+            val high = if b == 0xed then 0x9f else 0xbf
+            ok = continuation(i + 1, low, high) && continuation(i + 2)
+            i += 3
+        else if b >= 0xf0 && b <= 0xf4 then
+            // F0 needs 90..BF behind it (else overlong), F4 needs 80..8F (else above U+10FFFF)
+            val low = if b == 0xf0 then 0x90 else 0x80
+            val high = if b == 0xf4 then 0x8f else 0xbf
+            ok = continuation(i + 1, low, high) && continuation(i + 2) && continuation(i + 3)
+            i += 4
+        else ok = false
+    }
+    ok
+}
 
 /** Flat encoding for collections as flat lists: each element is prefixed by a `1` bit, terminated
   * by a `0` bit (`List a = Nil | Cons a (List a)` with one tag bit per node).

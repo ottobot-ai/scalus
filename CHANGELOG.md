@@ -13,6 +13,8 @@
 - **`ProgramFlatCodec.decodeFlat`, `DeBruijnedProgram.fromFlatEncoded` and `fromCbor` require the
   end of the input right behind the program's filler, as Plutus does. They used to ignore the bytes
   after it; code that needs that reads with `decodeFlatWithRemainingBytes`.**
+- The flat decoder rejects a `string` constant that is not UTF-8, as Plutus does. Before, malformed
+  bytes became U+FFFD.
 
 ## 1.4.1 (2026-10-25)
 
