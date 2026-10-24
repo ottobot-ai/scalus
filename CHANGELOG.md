@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- `serialiseData`, `Data.toCbor` and the flat encoding of `Data` have no nesting limit, as in
+  Plutus. Before, data nested more than 1000 levels failed with an overflow, and a `Constr` index of
+  72, 80, ... bits was written with a leading zero byte in its big number (#398).
+
 ## 1.4.1 (2026-10-25)
 
 ### Added

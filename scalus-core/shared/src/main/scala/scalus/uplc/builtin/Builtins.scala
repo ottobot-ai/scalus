@@ -1,7 +1,7 @@
 package scalus.uplc.builtin
-import io.bullet.borer.Cbor
 import scalus.cardano.onchain.plutus.prelude.List as PList
 import scalus.uplc.builtin.bls12_381.{G1Element, G2Element, MLResult}
+import scalus.uplc.builtin.internal.DataCborWriter
 
 import java.nio.ByteBuffer
 import java.nio.CharBuffer
@@ -655,13 +655,15 @@ private[builtin] abstract class AbstractBuiltins(using ps: PlatformSpecific):
 
     /** Serialize a Data value to CBOR format.
       *
+      * The nesting depth of the value is not limited, as in the reference implementation.
+      *
       * @return
       *   the CBOR-encoded bytestring
       * @since Plutus
       *   V2
       */
     def serialiseData(d: Data): ByteString =
-        ByteString.fromArray(Cbor.encode(d).toByteArray)
+        ByteString.fromArray(DataCborWriter.encode(d))
 
     /** Create a pair of Data values.
       *

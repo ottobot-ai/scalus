@@ -6,6 +6,7 @@ import io.bullet.borer.{ByteAccess, Cbor, DataItem as DI, Decoder, Encoder, Read
 import org.typelevel.paiges.Doc
 import org.typelevel.paiges.Doc.*
 import scalus.uplc.builtin.Data.{B, Constr, FromData, I, Map}
+import scalus.uplc.builtin.internal.DataCborWriter
 import scalus.compiler.fieldAsData
 import scalus.cardano.onchain.plutus.prelude.List as PList
 import scalus.serialization.flat
@@ -300,7 +301,7 @@ private trait DataApi {
     extension [A <: Data](a: A)
         /** Encode a [[Data]] value to CBOR.
           */
-        def toCbor: Array[Byte] = Cbor.encode(a)(using dataCborEncoder).toByteArray
+        def toCbor: Array[Byte] = DataCborWriter.encode(a)
 
         /** Encode a [[Data]] value to CBOR [[ByteString]]
           */
@@ -342,10 +343,10 @@ private trait DataApi {
 
     given Flat[Data] with
         def bitSize(a: Data): Int =
-            summon[Flat[Array[Byte]]].bitSize(Cbor.encode(a).toByteArray)
+            summon[Flat[Array[Byte]]].bitSize(DataCborWriter.encode(a))
 
         def encode(a: Data, encode: EncoderState): Unit =
-            flat.encode(Cbor.encode(a).toByteArray, encode)
+            flat.encode(DataCborWriter.encode(a), encode)
 
         def decode(decode: DecoderState): Data =
             val bytes = summon[Flat[Array[Byte]]].decode(decode)
