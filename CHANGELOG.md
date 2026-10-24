@@ -7,6 +7,9 @@
 - `serialiseData`, `Data.toCbor` and the flat encoding of `Data` have no nesting limit, as in
   Plutus. Before, data nested more than 1000 levels failed with an overflow, and a `Constr` index of
   72, 80, ... bits was written with a leading zero byte in its big number (#398).
+- The flat decoder reads a `data` constant of any nesting depth and ignores the bytes after its CBOR
+  item, as Plutus does. Before, such a script failed to decode (a stack overflow, borer's limit of
+  1000 levels, or the bytes after the item).
 
 ## 1.4.1 (2026-10-25)
 

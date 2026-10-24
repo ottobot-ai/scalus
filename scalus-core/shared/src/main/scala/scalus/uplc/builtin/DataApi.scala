@@ -6,7 +6,7 @@ import io.bullet.borer.{ByteAccess, Cbor, DataItem as DI, Decoder, Encoder, Read
 import org.typelevel.paiges.Doc
 import org.typelevel.paiges.Doc.*
 import scalus.uplc.builtin.Data.{B, Constr, FromData, I, Map}
-import scalus.uplc.builtin.internal.DataCborWriter
+import scalus.uplc.builtin.internal.{DataCborDecoder, DataCborWriter}
 import scalus.compiler.fieldAsData
 import scalus.cardano.onchain.plutus.prelude.List as PList
 import scalus.serialization.flat
@@ -348,9 +348,11 @@ private trait DataApi {
         def encode(a: Data, encode: EncoderState): Unit =
             flat.encode(DataCborWriter.encode(a), encode)
 
+        // The reference reads the constant through `deserialiseOrFail`, which keeps the first CBOR
+        // item of the bytes and drops what follows it (`Codec/Serialise.hs` of serialise 0.2.6.1).
         def decode(decode: DecoderState): Data =
             val bytes = summon[Flat[Array[Byte]]].decode(decode)
-            Cbor.decode(bytes).to[Data].value
+            DataCborDecoder.decodePrefix(bytes)._1
     end given
 
     /** Pretty prints Data in debug format with rainbow brackets: `<constr, [args]>`, `{k: v}`,
