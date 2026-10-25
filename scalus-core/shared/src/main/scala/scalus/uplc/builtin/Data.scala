@@ -3,6 +3,11 @@ package scalus.uplc.builtin
 import scalus.uplc.builtin.Data.{B, Constr, I, List, Map}
 import scalus.cardano.onchain.plutus.prelude.List as PList
 
+import scala.annotation.tailrec
+import scala.collection.mutable.ArrayDeque
+import scala.compiletime.asMatchable
+import scala.util.hashing.MurmurHash3
+
 /** The universal data type for Plutus smart contracts.
   *
   * `Data` is the core serializable type used throughout Cardano for representing:
@@ -33,7 +38,8 @@ import scalus.cardano.onchain.plutus.prelude.List as PList
   *   - `chooseData` - Pattern match on Data constructor
   *   - `constrData`, `mapData`, `listData`, `iData`, `bData` - Construct Data values
   *   - `unConstrData`, `unMapData`, `unListData`, `unIData`, `unBData` - Deconstruct Data values
-  *   - `equalsData` - Structural equality comparison
+  *   - `equalsData` - Structural equality comparison, in which the entries of a [[Data.Map]] are an
+  *     ordered list: reordered or repeated entries make two maps different
   *   - `serialiseData` - CBOR serialization (Plutus V2+)
   *
   * @example
@@ -57,6 +63,19 @@ import scalus.cardano.onchain.plutus.prelude.List as PList
   *   [[https://plutus.cardano.intersectmbo.org/resources/plutus-core-spec.pdf Plutus Core Specification]]
   */
 sealed abstract class Data {
+
+    /** Structural equality as the reference defines it (the derived `Eq` of `PlutusCore.Data`): the
+      * entries of a [[Data.Map]] are an ordered list, so their order and repetitions count.
+      *
+      * Data nested deeper than a fixed bound is compared with a work list on the heap, so data of
+      * any depth can be compared.
+      */
+    override def equals(other: Any): Boolean = other.asMatchable match
+        case that: Data => Data.structurallyEqual(this, that)
+        case _          => false
+
+    /** A hash that agrees with [[equals]]; it is computed without recursion as well. */
+    override def hashCode(): Int = Data.structuralHash(this)
 
     /** Debug string representation matching the Pretty instance format */
     override def toString: String = this match {
@@ -214,3 +233,134 @@ object Data extends DataApi:
       * Equivalent to `Constr(0, Nil)` - an empty constructor with tag 0.
       */
     val unit: Data = Constr(0, PList.Nil)
+
+    /** The deepest nesting that [[structurallyEqual]] follows by recursion. */
+    private inline val MaxRecursiveDepth = 128
+
+    /** Compares two values. Shallow data is compared by recursion, which is fast; data nested
+      * deeper than [[MaxRecursiveDepth]] levels is handed to [[iterativelyEqual]], so the stack use
+      * is bounded whatever the depth of the data. Lists and entries are walked in a loop.
+      */
+    private[builtin] def structurallyEqual(left: Data, right: Data): Boolean =
+        boundedEqual(left, right, 0)
+
+    private def boundedEqual(a: Data, b: Data, depth: Int): Boolean =
+        if a eq b then true
+        else if depth >= MaxRecursiveDepth then iterativelyEqual(a, b)
+        else
+            (a, b) match
+                case (Constr(i, xs), Constr(j, ys)) => i == j && elementsEqual(xs, ys, depth + 1)
+                case (Map(xs), Map(ys))             => entriesEqual(xs, ys, depth + 1)
+                case (List(xs), List(ys))           => elementsEqual(xs, ys, depth + 1)
+                case (I(x), I(y))                   => x == y
+                case (B(x), B(y))                   => x == y
+                case _                              => false
+
+    @tailrec private def elementsEqual(xs: PList[Data], ys: PList[Data], depth: Int): Boolean =
+        (xs, ys) match
+            case (PList.Cons(x, xt), PList.Cons(y, yt)) =>
+                boundedEqual(x, y, depth) && elementsEqual(xt, yt, depth)
+            case (PList.Nil, PList.Nil) => true
+            case _                      => false
+
+    @tailrec private def entriesEqual(
+        xs: PList[(Data, Data)],
+        ys: PList[(Data, Data)],
+        depth: Int
+    ): Boolean = (xs, ys) match
+        case (PList.Cons((xk, xv), xt), PList.Cons((yk, yv), yt)) =>
+            boundedEqual(xk, yk, depth) && boundedEqual(xv, yv, depth) &&
+            entriesEqual(xt, yt, depth)
+        case (PList.Nil, PList.Nil) => true
+        case _                      => false
+
+    /** Compares two values with a work list on the heap. A pair of lists of different lengths, or
+      * of different constructors, ends the comparison with `false` at once.
+      */
+    private def iterativelyEqual(left: Data, right: Data): Boolean =
+        // pairs to compare, a left element below its right element
+        val pending = ArrayDeque[Data](left, right)
+
+        @tailrec def pushPairs(xs: PList[Data], ys: PList[Data]): Boolean = (xs, ys) match
+            case (PList.Cons(x, xt), PList.Cons(y, yt)) =>
+                pending.append(x)
+                pending.append(y)
+                pushPairs(xt, yt)
+            case (PList.Nil, PList.Nil) => true
+            case _                      => false
+
+        @tailrec def pushEntries(xs: PList[(Data, Data)], ys: PList[(Data, Data)]): Boolean =
+            (xs, ys) match
+                case (PList.Cons((xk, xv), xt), PList.Cons((yk, yv), yt)) =>
+                    pending.append(xk)
+                    pending.append(yk)
+                    pending.append(xv)
+                    pending.append(yv)
+                    pushEntries(xt, yt)
+                case (PList.Nil, PList.Nil) => true
+                case _                      => false
+
+        var equal = true
+        while equal && pending.nonEmpty do
+            val b = pending.removeLast()
+            val a = pending.removeLast()
+            equal = (a eq b) || ((a, b) match
+                case (Constr(i, xs), Constr(j, ys)) => i == j && pushPairs(xs, ys)
+                case (Map(xs), Map(ys))             => pushEntries(xs, ys)
+                case (List(xs), List(ys))           => pushPairs(xs, ys)
+                case (I(x), I(y))                   => x == y
+                case (B(x), B(y))                   => x == y
+                case _                              => false)
+        equal
+
+    /** Hashes the constructors, the sizes and the leaves in a fixed walk of the value, so two
+      * values that [[structurallyEqual]] hashes alike.
+      */
+    private[builtin] def structuralHash(root: Data): Int =
+        val pending = ArrayDeque[Data](root)
+        var hash = MurmurHash3.productSeed
+        var count = 0
+
+        def mix(token: Int): Unit =
+            hash = MurmurHash3.mix(hash, token)
+            count += 1
+
+        @tailrec def pushAll(xs: PList[Data]): Unit = xs match
+            case PList.Cons(x, xt) =>
+                pending.append(x)
+                pushAll(xt)
+            case PList.Nil => ()
+
+        @tailrec def pushEntries(xs: PList[(Data, Data)]): Unit = xs match
+            case PList.Cons((k, v), xt) =>
+                pending.append(k)
+                pending.append(v)
+                pushEntries(xt)
+            case PList.Nil => ()
+
+        @tailrec def length(xs: PList[Any], acc: Int): Int = xs match
+            case PList.Cons(_, xt) => length(xt, acc + 1)
+            case PList.Nil         => acc
+
+        while pending.nonEmpty do
+            pending.removeLast() match
+                case Constr(i, xs) =>
+                    mix(1)
+                    mix(i.hashCode)
+                    mix(length(xs, 0))
+                    pushAll(xs)
+                case Map(xs) =>
+                    mix(2)
+                    mix(length(xs, 0))
+                    pushEntries(xs)
+                case List(xs) =>
+                    mix(3)
+                    mix(length(xs, 0))
+                    pushAll(xs)
+                case I(x) =>
+                    mix(4)
+                    mix(x.hashCode)
+                case B(x) =>
+                    mix(5)
+                    mix(x.hashCode)
+        MurmurHash3.finalizeHash(hash, count)

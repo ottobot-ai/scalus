@@ -18,6 +18,8 @@
 - The flat decoder keeps a program version component that does not fit an `Int` as `Int.MaxValue`
   instead of truncating it, so `1.2^32.0` is no longer read as `1.0.0`, which made a program with a
   `constr` term behind it fail to decode.
+- `Data` equality and `hashCode` need no stack proportional to the nesting depth, so deeply nested
+  `Data` can be compared and hashed without a `StackOverflowError`.
 
 ## 1.4.1 (2026-10-25)
 
