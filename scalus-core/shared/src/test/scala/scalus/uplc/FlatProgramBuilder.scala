@@ -12,6 +12,7 @@ object FlatProgramBuilder {
     case class Lam(body: Tm) extends Tm
     case class Ap(function: Tm, argument: Tm) extends Tm
     case class Builtin(tag: Int) extends Tm
+    case class Constr(tag: BigInt, args: Vector[Tm]) extends Tm
 
     /** A constant: its type tags (preorder) and the writer of its value. */
     case class Const(types: Vector[Int], value: Bits => Unit) extends Tm
@@ -95,6 +96,14 @@ object FlatProgramBuilder {
             b.bit(0)
             v(b)
         case Builtin(tag) => b.bits(7, 4); b.bits(tag, 7)
+        case Constr(tag, args) =>
+            b.bits(8, 4)
+            b.natural(tag)
+            args.foreach { arg =>
+                b.bit(1)
+                term(arg, b)
+            }
+            b.bit(0)
     }
 
     /** The bits of a program up to the end of its term: what follows is the caller's to write. */

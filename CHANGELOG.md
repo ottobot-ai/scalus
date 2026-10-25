@@ -15,6 +15,9 @@
   after it; code that needs that reads with `decodeFlatWithRemainingBytes`.**
 - The flat decoder rejects a `string` constant that is not UTF-8, as Plutus does. Before, malformed
   bytes became U+FFFD.
+- The flat decoder keeps a program version component that does not fit an `Int` as `Int.MaxValue`
+  instead of truncating it, so `1.2^32.0` is no longer read as `1.0.0`, which made a program with a
+  `constr` term behind it fail to decode.
 
 ## 1.4.1 (2026-10-25)
 

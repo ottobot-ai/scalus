@@ -499,10 +499,32 @@ object DeBruijnedProgram {
             fn.encode(Natural(BigInt(a.version._3)), enc)
             flat.encode(a.term, enc)
 
+        // The reference reads each version component as a `Natural` of any size and refuses a
+        // version it does not know only when it sets the script up. A component that does not fit
+        // an `Int` is kept as Int.MaxValue, which is no version anyone has defined; `toInt` would
+        // wrap it into one that is (1 + 2^32 would read as 1). The groups of seven bits are read
+        // without a `BigInt`, so that a long natural costs time linear in its length.
+        private def component(decoder: DecoderState): Int = {
+            var result = 0L
+            var shift = 0
+            var tooWide = false
+            var more = true
+            while more do {
+                val group = decoder.bits8(8)
+                more = (group & 0x80) != 0
+                val payload = (group & 0x7f).toLong
+                if payload != 0 then
+                    if shift > 28 then tooWide = true
+                    else result |= payload << shift
+                shift = math.min(shift + 7, 35)
+            }
+            if tooWide || result > Int.MaxValue then Int.MaxValue else result.toInt
+        }
+
         def decode(decoder: DecoderState): DeBruijnedProgram =
-            val v1 = fn.decode(decoder).n.toInt
-            val v2 = fn.decode(decoder).n.toInt
-            val v3 = fn.decode(decoder).n.toInt
+            val v1 = component(decoder)
+            val v2 = component(decoder)
+            val v3 = component(decoder)
             val term = flat.decode[Term](decoder)
             DeBruijnedProgram((v1, v2, v3), term)
 
