@@ -4,6 +4,7 @@ import scalus.*
 import scalus.serialization.flat.DecoderState
 import scalus.serialization.flat.EncoderState
 import scalus.serialization.flat.Flat
+import scalus.serialization.flat.FlatDecodingError
 
 object ProgramFlatCodec:
     private val flatCodec = summon[Flat[DeBruijnedProgram]]
@@ -53,12 +54,28 @@ object ProgramFlatCodec:
 
     /** Decodes Flat-encoded [[DeBruijnedProgram]] from bytes.
       *
+      * The program must end the bytes, as the reference's `unflatWith` requires: its filler (zero
+      * or more 0 bits and a 1 bit, which a longer-than-minimal one satisfies) ends exactly at the
+      * end of the input. Use [[decodeFlatWithRemainingBytes]] to read a program that is followed by
+      * other bytes.
+      *
+      * @throws FlatDecodingError
+      *   if the filler is missing, or bits or bytes follow it
       * @throws IllegalArgumentException
       *   see [[requireVersionCanCarry]]
       */
     def decodeFlat(encoded: Array[Byte]): DeBruijnedProgram =
         val decoderState = DecoderState(encoded)
         val program = flatCodec.decode(decoderState)
+        // `postAlignedDecoder` reads the filler (PlutusCore/Flat/Filler.hs) and `strictDecoder`
+        // requires the end of the input right behind it (PlutusCore/Flat/Decoder/Run.hs).
+        decoderState.filler()
+        if decoderState.usedBits != 0 then
+            throw new FlatDecodingError("the filler of the program ends inside a byte")
+        if decoderState.currPtr != encoded.length then
+            throw new FlatDecodingError(
+              s"${encoded.length - decoderState.currPtr} bytes follow the filler of the program"
+            )
         requireVersionCanCarry(program)
         program
 

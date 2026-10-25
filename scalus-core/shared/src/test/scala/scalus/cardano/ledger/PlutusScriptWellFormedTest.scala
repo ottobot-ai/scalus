@@ -2,6 +2,7 @@ package scalus.cardano.ledger
 
 import org.scalatest.funsuite.AnyFunSuite
 import scalus.serialization.cbor.Cbor
+import scalus.serialization.flat.FlatDecodingError
 import scalus.uplc.builtin.ByteString
 import scalus.uplc.{DeBruijnedProgram, Program}
 
@@ -52,9 +53,7 @@ class PlutusScriptWellFormedTest extends AnyFunSuite {
     test("the padding must end on a byte boundary") {
         // `0x82` ends the padding, `00001`, one bit before the end of the byte
         val badPadding = withLastByte(0x82)
-        assert(
-          DeBruijnedProgram.fromFlatEncoded(badPadding) == DeBruijnedProgram.fromFlatEncoded(flat)
-        )
+        assertThrows[FlatDecodingError](DeBruijnedProgram.fromFlatEncoded(badPadding))
         assert(wellFormed(Cbor.encode(badPadding)) == none)
     }
 

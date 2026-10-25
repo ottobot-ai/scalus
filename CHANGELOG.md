@@ -10,6 +10,9 @@
 - The flat decoder reads a `data` constant of any nesting depth and ignores the bytes after its CBOR
   item, as Plutus does. Before, such a script failed to decode (a stack overflow, borer's limit of
   1000 levels, or the bytes after the item).
+- **`ProgramFlatCodec.decodeFlat`, `DeBruijnedProgram.fromFlatEncoded` and `fromCbor` require the
+  end of the input right behind the program's filler, as Plutus does. They used to ignore the bytes
+  after it; code that needs that reads with `decodeFlatWithRemainingBytes`.**
 
 ## 1.4.1 (2026-10-25)
 
